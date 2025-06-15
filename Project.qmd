@@ -1,0 +1,247 @@
+---
+title: "Music and Mental Health"
+subtitle: "Data Programming project"
+author: "Elena Dameska"
+format: 
+    html:
+     toc: true
+     toc-location: left
+     toc-depth: 4
+     embed-resources: true
+editor: visual
+execute: 
+  error: true
+  warning: false
+  message: false
+  echo: true
+---
+
+## 1.Introduction and description of the problem
+
+Many people use music as a tool to regulate emotions, reduce stress and improve overall mental health. Music therapy has become a recognized mental health treatment approach, but it is still unknown how various musical genres impact mental health.
+
+The purpose of this project is to explore the relationship between music preferences and self-reported mental health conditions by using the [Music and Mental Health (MxMH) dataset](https://www.kaggle.com/datasets/catherinerasgaitis/mxmh-survey-results). In this analysis, I aim to analyze whether there is a noticeable pattern between how often people listen to certain genres and their levels of anxiety, depression, and stress.
+
+## 2.Presentation of the data
+
+### Loading libraries and dataset
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(gt)
+library(skimr)
+
+df <- read_csv("RProjectData/mxmh_survey_results.csv") |>
+  clean_names() |> 
+  data.frame()
+
+```
+
+### Data overview
+
+```{r}
+df |> head(10) |> gt(caption="First 10 rows of the dataset")
+```
+
+#### Key columns explained
+
+-   `timestamp` : Date and time when the survey was submitted
+-   `age`: Age of the respondent
+-   `primary_streaming_service` : Music platform the respondent uses the most (Spotify, YouTube, Pandora etc.)
+-   `hours_per_day` : Average number of hours spent listening to music per day
+-   `while_working` : Whether the respondent listens to music while working (Yes/No)
+-   `instrumentalist`, `composer` : Whether the respondent plays an instrument or composes music (Yes/No)
+-   `fav_genre` : Respondent's favorite music genre (Pop, Rock, Classical etc.)
+-   `exploratory` : Whether the respondent explores new music genres/artists (Yes/No)
+-   `foreign_languages` : Whether the respondent listens to music in a foreign language (Yes/No)
+-   `bpm` : Beats per minute of favorite genre
+-   `frequency_[genre]` : How often the respondent listens to a specific genre (answers include Never, Rarely, Sometimes, Very frequently)
+-   `anxiety`, `depression`, `insomnia`, `ocd` : Self-reported mental health scores (0–10 scale)
+-   `music_effects` : Does music improve/worsen respondent's mental health conditions? (Improve, Worsen, No effect)
+
+The dataset contains 736 responses and 33 columns. Most columns are categorical (26 character columns), while 7 are numeric.
+
+```{r}
+skimr::skim(df)
+```
+
+#### Character columns
+
+-   All character columns are complete with 0–4 missing values, except `music_effects` which has 8 missing values, however since its complete_rate is 0.99 it is not a problem.
+-   `fav_genre` has 16 unique values, while the frequency columns have 4 unique categories like Never, Sometimes, Frequently, Very frequently.
+
+#### Numeric columns
+
+-   The `age` column has values ranging from 10 to 89, with a mean of 25. It is interesting to not that almost half of the respondents are between 18 and 25 years old, while there is a single person above the age of 80.
+
+```{r}
+df |> dplyr::filter(age >=18, age<=25) |>
+  summarize(count_18_to_25=n())
+df |> dplyr::filter(age >80) |>
+  summarize(older_than_80=n())
+```
+
+-   The `hours_per_day` column has values ranging from 0 to 24, with a mean of 3.57 hours per day. Additionally, a total of 3 people have answered that they listen to music 24 hours a day, which is quite interesting.
+
+```{r}
+df |> dplyr::filter(hours_per_day==24) |>
+  summarize(maxAge=n())
+```
+
+-   The `bpm` contains a large number of problematic values as it has 107 missing values and a mean of 1589948.34, which is far outside the expected range of 60 to 200 bpm.
+
+```{r}
+df |> 
+  dplyr::filter(is.na(bpm) | bpm > 200 | bpm < 60) |>
+  summarize(problematic_bpm=n())
+```
+
+This suggests incorrect data entry. Given the high number of invalid or missing entries, I will remove the column from the analysis, as it is unlikely to provide meaningful insights.
+
+```{r}
+df<- df |> 
+  dplyr::select(-bpm)
+```
+
+## 3. Tranformation of data
+
+### Average listening hours per genre
+
+```{r}
+df |> 
+  group_by(fav_genre) |> 
+  summarize(avg_hours = mean(hours_per_day, na.rm = TRUE)) |> 
+  arrange(desc(avg_hours)) |> 
+  gt(caption = "Table 1: Average listening hours per genre") |> 
+  cols_label(
+    fav_genre = "Favorite genre",
+    avg_hours = "Average hours per day"
+  )
+```
+
+The results show that Latin, Jazz, and Rap listeners spend the most time listening to music on average (over 5 hours/day), while Classical, Pop, and Gospel fans tend to listen less (around 2.9 hours/day or less).
+
+### Music exploration habits
+
+```{r}
+df |> 
+  count(exploratory, fav_genre) |> 
+  pivot_wider(names_from = exploratory, values_from = n, values_fill = 0) |> 
+  gt(caption = "Table 2: Exploration of new music by genre")
+```
+
+This suggests that some genres like Rock and Pop have more exploratory listeners, while others like Gospel or Latin have fewer.
+
+### Hours per day vs. mental illness
+
+```{r}
+df |> 
+  mutate(avg_mh = rowMeans(across(c(anxiety, depression, insomnia, ocd)), na.rm = TRUE)) |> 
+  group_by(fav_genre) |> 
+  summarize(
+    avg_hours = mean(hours_per_day, na.rm = TRUE),
+    avg_mental_health = mean(avg_mh, na.rm = TRUE)
+  ) |> 
+  arrange(desc(avg_mental_health)) |> 
+  gt(caption = "Table 3: Average listening hours and mental health scores by genre") |> 
+  cols_label(
+    fav_genre = "Favorite genre",
+    avg_hours = "Avg. hours/day",
+    avg_mental_health = "Avg. mental health score"
+  )
+
+```
+
+This table shows the average number of hours respondents listen to music per day and their average mental health scores, grouped by their favorite genre.
+
+-   `Lofi`, `Hip hop`, `Rock`, and `Metal` listeners report higher average mental health scores (i.e., more symptoms) and tend to listen more.
+-   `Latin` and `Gospel` fans have lower mental health scores and relatively high or low listening times.
+-   `Rap` stands out with high listening time but surprisingly lower average mental health scores.
+
+This suggests there might be a loose trend between higher listening time and elevated mental health scores, especially for genres like `Lofi` and `Hip hop`.
+
+### Average mental health scores by favorite genre
+
+```{r}
+df |> 
+  group_by(fav_genre) |> 
+  summarize(across(c(anxiety, depression, insomnia, ocd), mean, na.rm=TRUE)) |> 
+  gt(caption = "Table 4: Average mental health scores by favorite genre")
+
+```
+
+This table shows the average self-reported scores for `anxiety`, `depression`, `insomnia`, and `ocd` for respondents grouped by their `favorite music genre`.
+
+-   For example, people who prefer `Folk` music report the highest average anxiety (6.57) and depression (5.07) scores.
+-   `Lofi` listeners have the highest depression (6.6) and insomnia (5.6) averages.
+-   On the other hand, `Gospel` fans report the lowest depression (2.67) and OCD (0.33) scores.
+
+This suggests there might be a relationship between preferred music genre and mental health symptoms, which could be interesting for further analysis or discussion.
+
+## 4. Exploratory Data Analysis
+
+### Bar chart of mental health scores by favorite genre
+
+```{r}
+df |>
+  group_by(fav_genre) |>
+  summarize(across(c(anxiety, depression, insomnia, ocd), mean, na.rm = TRUE)) |>
+  pivot_longer(cols = c(anxiety, depression, insomnia, ocd), names_to = "condition", values_to = "avg_score") |>
+  ggplot(aes(x = reorder(fav_genre, -avg_score), y = avg_score, fill = condition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Average Mental Health Scores by Genre",
+    x = "Favorite Genre",
+    y = "Average Score",
+    fill = "Condition"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+
+```
+
+This is a visual representation of Table 4 from the previous section. It provides a clear visual comparison of the average mental health scores across genres, making it easier to spot differences and trends at a glance. The chart highlights which genres are associated with higher or lower levels of each condition, helping to quickly identify patterns that the table alone might not reveal.
+
+### Scatterplot of hours per day vs.anxiety score by genre
+
+```{r}
+ggplot(df, aes(x = hours_per_day, y = anxiety, color = fav_genre)) +
+  geom_point(alpha = 1) +
+  labs(title = "Hours per day vs. Anxiety by Favorite Genre",
+       x = "Hours of music listening per day",
+       y = "Anxiety score") +
+  theme_minimal()
+
+
+```
+
+The scatterplot visually presents individual data points showing how much music someone listens to per day, their anxiety level, and their favorite music genre. While there isn't a clear linear relationship between music listening hours and anxiety across all individuals, the plot reveals that the majority of respondents listen to music for under 10 hours a day, with anxiety scores widely distributed across all levels within this range. Some notable outliers include individuals with very high listening hours (20+ hours) who report varying anxiety levels, suggesting that extreme listening duration alone doesn't dictate anxiety.
+
+### Boxplots for mental health scores by music effects
+
+```{r}
+df |> 
+  pivot_longer(cols = c(anxiety, depression, insomnia, ocd), names_to = "condition", values_to = "score") |> 
+  ggplot(aes(x = music_effects, y = score, fill = music_effects)) +
+  geom_boxplot() +
+  facet_wrap(~ condition) +
+  labs(title = "Mental Health Scores by Music Effects",
+       x = "Music Effects on Mental Health",
+       y = "Score") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+This faceted box plot effectively illustrates that respondents who believe music "Improves" their mental health generally report lower `anxiety`, `depression`, `insomnia`, and `OCD` scores, while those who perceive music as "Worsening" their mental health tend to exhibit higher scores across all four conditions. The "No effect" group typically falls between these two extremes, and the "NA" group, though potentially small, generally shows lower scores.
+
+## 5. Conclusion
+
+This analysis highlights meaningful patterns between music preferences and self-reported mental health. While causal links can't be confirmed, certain genres, such as `Lofi`, `Hip hop`, and `Rock`, are associated with higher levels of `anxiety`, `depression`, and `insomnia`. In contrast, genres like `Gospel` and `Latin` appear linked to lower symptom scores. Additionally, respondents who believe music improves their mental health generally report fewer mental health issues.
+
+These insights suggest that music may play a reflective or even therapeutic role in mental well-being, making it a valuable area for deeper research, especially in mental health interventions and personalized music recommendations.
+
+## 6. References
+
+-   Music and Mental Health (MxMH) dataset: [Kaggle](https://www.kaggle.com/datasets/catherinerasgaitis/mxmh-survey-results)
