@@ -4,7 +4,7 @@ Author: **Elena Dameska**
 
 ## 📌 Project Overview
 
-This project explores the relationship between music preferences and mental health using the **Music and Mental Health (MxMH)** dataset. Music is known to influence emotions, but the impact of specific genres on mental well-being is still not fully understood. This analysis aims to identify potential patterns between genre preferences and self-reported levels of anxiety, depression, and stress.
+This project explores the relationship between music preferences and mental health using the **Music and Mental Health (MxMH)** dataset. Music is known to influence emotions, but the impact of specific genres on mental well-being is still not fully understood. This analysis aims to identify potential patterns between genre preferences and self-reported levels of anxiety, depression, and stress. You can view this project [here](https://coruscating-marshmallow-94c788.netlify.app/)
 
 ## 📂 Table of Contents
 
